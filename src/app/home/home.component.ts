@@ -7,7 +7,7 @@ import { GifListComponent } from './ui/gif-list.component';
   standalone: true,
   imports: [GifListComponent],
   template: `
-    <p>Hello world!</p>
+    <h2>Reddit Gif Player</h2>
     <app-gif-list
       [gifs]="redditService.gifs()"
       class="grid-container"
