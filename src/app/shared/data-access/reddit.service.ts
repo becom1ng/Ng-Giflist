@@ -1,8 +1,19 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Gif, RedditPost, RedditResponse } from '../interfaces';
-import { catchError, concatMap, EMPTY, map, startWith, Subject } from 'rxjs';
+import {
+  catchError,
+  concatMap,
+  debounceTime,
+  distinctUntilChanged,
+  EMPTY,
+  map,
+  startWith,
+  Subject,
+  switchMap,
+} from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
+import { FormControl } from '@angular/forms';
 
 export interface GifsState {
   gifs: Gif[];
@@ -16,6 +27,7 @@ export interface GifsState {
 })
 export class RedditService {
   private http = inject(HttpClient);
+  subredditFormControl = new FormControl();
 
   // state
   private state = signal<GifsState>({
@@ -33,9 +45,23 @@ export class RedditService {
 
   // sources
   pagination$ = new Subject<string | null>();
-  private gifsLoaded$ = this.pagination$.pipe(
-    startWith(null),
-    concatMap((lastKnownGif) => this.fetchFromReddit('gifs', lastKnownGif, 20))
+
+  private subredditChanged$ = this.subredditFormControl.valueChanges.pipe(
+    debounceTime(300),
+    distinctUntilChanged(),
+    startWith('gifs'),
+    map((subreddit) => (subreddit.length ? subreddit : 'gifs')),
+  );
+
+  private gifsLoaded$ = this.subredditChanged$.pipe(
+    switchMap((subreddit) =>
+      this.pagination$.pipe(
+        startWith(null),
+        concatMap((lastKnownGif) =>
+          this.fetchFromReddit(subreddit, lastKnownGif, 20),
+        ),
+      ),
+    ),
   );
 
   constructor() {
@@ -46,19 +72,28 @@ export class RedditService {
         gifs: [...state.gifs, ...response.gifs],
         loading: false,
         lastKnownGif: response.lastKnownGif,
-      }))
+      })),
     );
+
+    this.subredditChanged$.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.state.update((state) => ({
+        ...state,
+        loading: true,
+        gifs: [],
+        lastKnownGif: null,
+      }));
+    });
   }
 
   private fetchFromReddit(
     subreddit: string,
     after: string | null,
-    gifsRequired: number
+    gifsRequired: number,
   ) {
     return this.http
       .get<RedditResponse>(
         `https://www.reddit.com/r/${subreddit}/hot/.json?limit=100` +
-          (after ? `&after=${after}` : '')
+          (after ? `&after=${after}` : ''),
       )
       .pipe(
         catchError((err) => EMPTY),
@@ -73,7 +108,7 @@ export class RedditService {
             gifsRequired,
             lastKnownGif,
           };
-        })
+        }),
       );
   }
 
