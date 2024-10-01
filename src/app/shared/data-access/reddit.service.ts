@@ -13,7 +13,7 @@ import {
   switchMap,
 } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormControl } from '@angular/forms';
 
 export interface GifsState {
@@ -46,6 +46,7 @@ export class RedditService {
 
   // sources
   pagination$ = new Subject<string | null>();
+  private error$ = new Subject<string | null>();
 
   private subredditChanged$ = this.subredditFormControl.valueChanges.pipe(
     debounceTime(300),
@@ -103,6 +104,13 @@ export class RedditService {
         lastKnownGif: null,
       }));
     });
+
+    this.error$.pipe(takeUntilDestroyed()).subscribe((error) =>
+      this.state.update((state) => ({
+        ...state,
+        error,
+      }))
+    );
   }
 
   private fetchFromReddit(
@@ -116,7 +124,10 @@ export class RedditService {
         (after ? `&after=${after}` : ''),
       )
       .pipe(
-        catchError((err) => EMPTY),
+        catchError((err) => {
+          this.handleError(err);
+          return EMPTY;
+        }),
         map((response) => {
           const posts = response.data.children;
           const lastKnownGif = posts.length
@@ -188,5 +199,16 @@ export class RedditService {
 
     // No useable formats available
     return null;
+  }
+
+  private handleError(err: HttpErrorResponse) {
+    // Handle specific error cases
+    if (err.status === 404 && err.url) {
+      this.error$.next(`Failed to load gifs for /r/${err.url.split('/')[4]}`);
+      return;
+    }
+
+    // Generic error if no cases match
+    this.error$.next(err.statusText);
   }
 }
