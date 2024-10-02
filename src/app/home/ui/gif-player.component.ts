@@ -6,10 +6,12 @@ import {
   computed,
   signal,
   effect,
+  inject,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { fromEvent, Subject, switchMap } from 'rxjs';
+import { UserPreferencesService } from '../../shared/data-access/user-preferences.service';
 
 interface GifPlayerState {
   playing: boolean;
@@ -22,7 +24,7 @@ interface GifPlayerState {
   imports: [MatProgressSpinnerModule],
   template: `
     @if (status() === 'loading') {
-    <mat-progress-spinner mode="indeterminate" diameter="50" />
+      <mat-progress-spinner mode="indeterminate" diameter="50" />
     }
     <div
       class="preload-background"
@@ -37,8 +39,8 @@ interface GifPlayerState {
         #gifPlayer
         playsinline
         preload="none"
-        [loop]="true"
-        [muted]="true"
+        [loop]="userPrefsService.loop()"
+        [muted]="userPrefsService.mute()"
         [src]="src()"
       ></video>
     </div>
@@ -80,6 +82,7 @@ interface GifPlayerState {
   ],
 })
 export class GifPlayerComponent {
+  userPrefsService = inject(UserPreferencesService);
   src = input.required<string>();
   thumbnail = input.required<string>();
 
@@ -96,36 +99,36 @@ export class GifPlayerComponent {
   playing = computed(() => this.state().playing);
   status = computed(() => this.state().status);
 
-  // sources
+  // sources / actions
   togglePlay$ = new Subject<void>();
 
   videoLoadStart$ = this.togglePlay$.pipe(
     switchMap(() => this.videoElement$),
-    switchMap(({ nativeElement }) => fromEvent(nativeElement, 'loadstart'))
+    switchMap(({ nativeElement }) => fromEvent(nativeElement, 'loadstart')),
   );
 
   videoLoadComplete$ = this.videoElement$.pipe(
-    switchMap(({ nativeElement }) => fromEvent(nativeElement, 'loadeddata'))
+    switchMap(({ nativeElement }) => fromEvent(nativeElement, 'loadeddata')),
   );
 
   constructor() {
-    // reducers / actions
+    // reducers
+    this.togglePlay$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() =>
+        this.state.update((state) => ({ ...state, playing: !state.playing })),
+      );
+
     this.videoLoadStart$
       .pipe(takeUntilDestroyed())
       .subscribe(() =>
-        this.state.update((state) => ({ ...state, status: 'loading' }))
+        this.state.update((state) => ({ ...state, status: 'loading' })),
       );
 
     this.videoLoadComplete$
       .pipe(takeUntilDestroyed())
       .subscribe(() =>
-        this.state.update((state) => ({ ...state, status: 'loaded' }))
-      );
-
-    this.togglePlay$
-      .pipe(takeUntilDestroyed())
-      .subscribe(() =>
-        this.state.update((state) => ({ ...state, playing: !state.playing }))
+        this.state.update((state) => ({ ...state, status: 'loaded' })),
       );
 
     effect(() => {

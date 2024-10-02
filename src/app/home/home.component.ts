@@ -4,6 +4,8 @@ import { GifListComponent } from './ui/gif-list.component';
 import { InfiniteScrollDirective } from 'ngx-infinite-scroll';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { SearchBarComponent } from './ui/search-bar.component';
+import { UserPreferencesBarComponent } from './ui/user-preferences-bar.component';
+import { UserPreferencesService } from '../shared/data-access/user-preferences.service';
 
 @Component({
   selector: 'app-home',
@@ -13,11 +15,16 @@ import { SearchBarComponent } from './ui/search-bar.component';
     InfiniteScrollDirective,
     SearchBarComponent,
     MatProgressSpinnerModule,
+    UserPreferencesBarComponent,
   ],
   template: `
     <app-search-bar
       [subredditFormControl]="redditService.subredditFormControl"
     ></app-search-bar>
+
+    <app-user-preferences-bar
+      [userPrefsFormGroup]="userPrefsService.userPrefsFormGroup"
+    ></app-user-preferences-bar>
 
     @if (redditService.loading()) {
       <mat-progress-spinner mode="indeterminate" diameter="50" />
@@ -42,4 +49,5 @@ import { SearchBarComponent } from './ui/search-bar.component';
 })
 export default class HomeComponent {
   redditService = inject(RedditService);
+  userPrefsService = inject(UserPreferencesService);
 }

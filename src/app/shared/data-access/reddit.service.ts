@@ -15,6 +15,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormControl } from '@angular/forms';
+import { UserPreferencesService } from './user-preferences.service';
 
 export interface GifsState {
   gifs: Gif[];
@@ -28,6 +29,7 @@ export interface GifsState {
 })
 export class RedditService {
   private http = inject(HttpClient);
+  private userPrefsService = inject(UserPreferencesService);
   subredditFormControl = new FormControl();
 
   // state
@@ -44,7 +46,7 @@ export class RedditService {
   loading = computed(() => this.state().loading);
   lastKnownGif = computed(() => this.state().lastKnownGif);
 
-  // sources
+  // sources / actions
   pagination$ = new Subject<string | null>();
   private error$ = new Subject<string | null>();
 
@@ -73,12 +75,12 @@ export class RedditService {
 
               return shouldKeepTrying
                 ? this.fetchFromReddit(
-                  subreddit,
-                  lastKnownGif,
-                  remainingGifsToFetch
-                )
+                    subreddit,
+                    lastKnownGif,
+                    remainingGifsToFetch,
+                  )
                 : EMPTY;
-            })
+            }),
           ),
         ),
       ),
@@ -109,7 +111,7 @@ export class RedditService {
       this.state.update((state) => ({
         ...state,
         error,
-      }))
+      })),
     );
   }
 
@@ -121,7 +123,7 @@ export class RedditService {
     return this.http
       .get<RedditResponse>(
         `https://www.reddit.com/r/${subreddit}/hot/.json?limit=100` +
-        (after ? `&after=${after}` : ''),
+          (after ? `&after=${after}` : ''),
       )
       .pipe(
         catchError((err) => {
@@ -148,7 +150,9 @@ export class RedditService {
 
     return posts
       .map((post) => {
-        const over18 = post.data.over_18;
+        const over18 = this.userPrefsService.hideAdultThumbnails()
+          ? post.data.over_18
+          : false;
         const thumbnail = over18 ? 'nsfw' : post.data.thumbnail;
         const modifiedThumbnail = defaultThumbnails.includes(thumbnail)
           ? `/assets/${thumbnail}.png`
