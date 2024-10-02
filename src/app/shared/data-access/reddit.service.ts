@@ -148,7 +148,8 @@ export class RedditService {
 
     return posts
       .map((post) => {
-        const thumbnail = post.data.thumbnail;
+        const over18 = post.data.over_18;
+        const thumbnail = over18 ? 'nsfw' : post.data.thumbnail;
         const modifiedThumbnail = defaultThumbnails.includes(thumbnail)
           ? `/assets/${thumbnail}.png`
           : thumbnail;

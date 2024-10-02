@@ -13,6 +13,7 @@ interface RedditPostData {
   url: string;
   thumbnail: string;
   num_comments: number;
+  over_18: boolean;
 }
 
 interface RedditPreview {
