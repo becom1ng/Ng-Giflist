@@ -9,16 +9,21 @@ import { WINDOW } from '../../shared/utils/injection-tokens';
 @Component({
   selector: 'app-gif-list',
   standalone: true,
-  imports: [GifPlayerComponent, MatToolbarModule, MatIconModule, MatButtonModule],
+  imports: [
+    GifPlayerComponent,
+    MatToolbarModule,
+    MatIconModule,
+    MatButtonModule,
+  ],
   template: `
-    @for (gif of gifs(); track gif.permalink){
+    @for (gif of gifs(); track gif.permalink) {
       <div>
         <mat-toolbar color="primary">
           <span>{{ gif.title }}</span>
           <span class="toolbar-spacer"></span>
           <button
             mat-icon-button
-            (click)="window.open('https://reddit.com/' + gif.permalink)"
+            (click)="window.open('https://reddit.com' + gif.permalink)"
           >
             <mat-icon>comment</mat-icon>
           </button>
