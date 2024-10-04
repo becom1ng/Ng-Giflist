@@ -8,10 +8,11 @@ import {
   effect,
   inject,
 } from '@angular/core';
-import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { fromEvent, Subject, switchMap } from 'rxjs';
+import { fromEvent, map, merge, Subject, switchMap } from 'rxjs';
 import { UserPreferencesService } from '../../shared/data-access/user-preferences.service';
+import { connect } from 'ngxtension/connect';
 
 interface GifPlayerState {
   playing: boolean;
@@ -101,35 +102,24 @@ export class GifPlayerComponent {
 
   // sources / actions
   togglePlay$ = new Subject<void>();
-
   videoLoadStart$ = this.togglePlay$.pipe(
     switchMap(() => this.videoElement$),
     switchMap(({ nativeElement }) => fromEvent(nativeElement, 'loadstart')),
   );
-
   videoLoadComplete$ = this.videoElement$.pipe(
     switchMap(({ nativeElement }) => fromEvent(nativeElement, 'loadeddata')),
   );
 
   constructor() {
     // reducers
-    this.togglePlay$
-      .pipe(takeUntilDestroyed())
-      .subscribe(() =>
-        this.state.update((state) => ({ ...state, playing: !state.playing })),
-      );
+    const nextState$ = merge(
+      this.videoLoadStart$.pipe(map(() => ({ status: 'loading' as const }))),
+      this.videoLoadComplete$.pipe(map(() => ({ status: 'loaded' as const }))),
+    );
 
-    this.videoLoadStart$
-      .pipe(takeUntilDestroyed())
-      .subscribe(() =>
-        this.state.update((state) => ({ ...state, status: 'loading' })),
-      );
-
-    this.videoLoadComplete$
-      .pipe(takeUntilDestroyed())
-      .subscribe(() =>
-        this.state.update((state) => ({ ...state, status: 'loaded' })),
-      );
+    connect(this.state)
+      .with(nextState$)
+      .with(this.togglePlay$, (state) => ({ playing: !state.playing }));
 
     effect(() => {
       // const video = this.videoElement().nativeElement (same as below)
