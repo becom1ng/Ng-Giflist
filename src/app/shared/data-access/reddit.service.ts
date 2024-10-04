@@ -8,14 +8,15 @@ import {
   EMPTY,
   expand,
   map,
+  merge,
   startWith,
   Subject,
   switchMap,
 } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormControl } from '@angular/forms';
 import { UserPreferencesService } from './user-preferences.service';
+import { connect } from 'ngxtension/connect';
 
 export interface GifsState {
   gifs: Gif[];
@@ -88,31 +89,37 @@ export class RedditService {
   );
 
   constructor() {
-    //reducers
-    this.gifsLoaded$.pipe(takeUntilDestroyed()).subscribe((response) =>
-      this.state.update((state) => ({
+    // reducers
+    const nextState$ = merge(
+      this.subredditChanged$.pipe(
+        map(() => ({
+          loading: true,
+          gifs: [],
+          lastKnownGif: null,
+        })),
+      ),
+      this.error$.pipe(map((error) => ({ error }))),
+    );
+
+    connect(this.state)
+      .with(nextState$)
+      .with(this.gifsLoaded$, (state, response) => ({
         ...state,
         gifs: [...state.gifs, ...response.gifs],
         loading: false,
         lastKnownGif: response.lastKnownGif,
-      })),
-    );
-
-    this.subredditChanged$.pipe(takeUntilDestroyed()).subscribe(() => {
-      this.state.update((state) => ({
-        ...state,
-        loading: true,
-        gifs: [],
-        lastKnownGif: null,
       }));
-    });
-
-    this.error$.pipe(takeUntilDestroyed()).subscribe((error) =>
-      this.state.update((state) => ({
-        ...state,
-        error,
-      })),
-    );
+    // ! OR remove nextState$ and use commented block below
+    // .with(this.subredditChanged$, (state) => ({
+    //   ...state,
+    //   loading: true,
+    //   gifs: [],
+    //   lastKnownGif: null,
+    // }))
+    // .with(this.error$, (state, error) => ({
+    //   ...state,
+    //   error,
+    // }));
   }
 
   private fetchFromReddit(
